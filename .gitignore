@@ -7,7 +7,8 @@ __pycache__/
 .env
 
 # Data and models
-data/
+data/*
+!data/.gitkeep
 models/*.pkl
 
 # Editor files
