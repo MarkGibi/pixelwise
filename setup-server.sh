@@ -31,3 +31,15 @@ if command -v psql >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/.env" ]; then
     | grep -q 1 || \
     sudo -u postgres createdb -O pixelwise pixelwise
 fi
+
+# Install the auto-deploy systemd timer on prod
+if [ -f "$SCRIPT_DIR/deploy/systemd/pixelwise-deploy.timer" ] \
+	 && command -v systemctl >/dev/null 2>&1 \
+	 && id produser >/dev/null 2>&1; then
+	sudo cp "$SCRIPT_DIR/deploy/systemd/pixelwise-deploy.service" \
+		/etc/systemd/system/pixelwise-deploy.service
+	sudo cp "$SCRIPT_DIR/deploy/systemd/pixelwise-deploy.timer" \
+		/etc/systemd/system/pixelwise-deploy.timer
+	sudo systemctl daemon-reload
+	sudo systemctl enable --now pixelwise-deploy.timer
+fi
