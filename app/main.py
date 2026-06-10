@@ -9,6 +9,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from app.classifier import classify_batch
+from app.models import Prediction, SessionLocal
 
 load_dotenv()
 
@@ -46,7 +47,29 @@ def health():
 
 @app.get("/results")
 def results():
-    return {"results": [], "note": "persistence not yet implemented"}
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(Prediction)
+            .order_by(Prediction.created_at.desc())
+            .limit(20)
+            .all()
+        )
+
+        return {
+            "results": [
+                {
+                    "id": r.id,
+                    "prediction": r.prediction,
+                    "confidence": r.confidence,
+                    "model_version": r.model_version,
+                    "created_at": r.created_at.isoformat(),
+                }
+                for r in rows
+            ]
+        }
+    finally:
+        db.close()
 
 
 @app.post(
@@ -57,4 +80,19 @@ def results():
 @limiter.limit("10/minute")
 def classify(request: Request, req: ClassifyRequest):
     arr = np.array(req.pixels, dtype=np.uint8)[np.newaxis]
-    return classify_batch(arr)[0]
+    result = classify_batch(arr)[0]
+
+    db = SessionLocal()
+    try:
+        db.add(
+            Prediction(
+                prediction=result["prediction"],
+                confidence=result["confidence"],
+                model_version="v1",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    return result
